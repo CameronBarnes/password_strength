@@ -1,0 +1,13 @@
+[package]
+name = "password_strength_lib"
+authors = { workspace = true }
+edition = { workspace = true }
+version = "0.1.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = "2.0"
+itertools = "0.14"
+rayon = "1.10"

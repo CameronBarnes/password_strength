@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = ["password_strength_lib"]
+
+[workspace.package]
+authors = ["Cameron Barnes <cameron_barnes@outlook.com>"]
+edition = "2024"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+enum_glob_use = "deny"
+pedantic = "deny"
+nursery = "deny"
+
+[workspace.dependencies]
+
+[package]
+name = "password_strength"
+authors = { workspace = true }
+edition = { workspace = true }
+version = "0.1.0"
+
+[lints]
+workspace = true
+
+[profile.release]
+opt-level = 3 # change to s to reduce binary size with a performance tradeoff
+lto = "fat"
+codegen-units = 1
+panic = 'abort'
+strip = "symbols"
+
+[dependencies]
+password_strength_lib = { path = "./password_strength_lib" }
