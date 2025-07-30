@@ -45,7 +45,6 @@ fn load_dictionary(trie: &mut StrTrie<usize>, path: &PathBuf) {
 
 #[allow(clippy::cast_precision_loss)]
 fn score_span(dict: &StrTrie<usize>, rock_you: &StrTrie<usize>, span: &str) -> f64 {
-    println!("scoring span: {span}");
     let num_words = dict.len() as f64;
     let rock_you_count = rock_you.len() as f64;
     let span = demunge(span).to_ascii_lowercase();
