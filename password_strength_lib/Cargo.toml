@@ -8,6 +8,7 @@ version = "0.1.0"
 workspace = true
 
 [dependencies]
+rstrie = "0.6"
 thiserror = "2.0"
 itertools = "0.14"
 rayon = "1.10"

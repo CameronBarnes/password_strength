@@ -1,4 +1,6 @@
+use std::fmt::Write as _;
 use std::io::{Write, stdin, stdout};
+use std::path::PathBuf;
 
 use num_format::{Locale, ToFormattedString};
 
@@ -14,7 +16,11 @@ fn main() {
         eprintln!("Password may only be ascii characters.");
         std::process::exit(1);
     }
-    let strength = password_strength_lib::estimate_strength(password.trim());
+    let strength = password_strength_lib::estimate_strength(
+        password.trim(),
+        vec![PathBuf::from("./words_alpha.txt")],
+        Some(PathBuf::from("./rockyou.txt")),
+    );
     print_speed_for_common_hash("MD5", 98_262_800_000., strength);
     print_speed_for_common_hash("SHA256", 13_075_800_000., strength);
     print_speed_for_common_hash("SHA512", 4_460_800_000., strength);
@@ -25,6 +31,7 @@ fn main() {
     print_speed_for_common_hash("bcrypt", 131_200., strength);
 }
 
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn format_duration(duration: f64) -> String {
     let minutes = duration / 60.;
     let hours = minutes / 60.;
@@ -38,19 +45,19 @@ fn format_duration(duration: f64) -> String {
 
     let mut out = String::new();
     if years > 0 {
-        out.push_str(&format!("{}y ", years.to_formatted_string(&Locale::en)));
+        let _ = write!(out, "{}y ", years.to_formatted_string(&Locale::en));
     }
     if days > 0 {
-        out.push_str(&format!("{days}d "));
+        let _ = write!(out, "{days}d ");
     }
     if hours > 0 {
-        out.push_str(&format!("{hours}h "));
+        let _ = write!(out, "{hours}h ");
     }
     if minutes > 0 {
-        out.push_str(&format!("{minutes}m "));
+        let _ = write!(out, "{minutes}m ");
     }
     if seconds > 0 {
-        out.push_str(&format!("{seconds}s"));
+        let _ = write!(out, "{seconds}s");
     }
     out
 }
