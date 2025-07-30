@@ -45,16 +45,26 @@ fn load_dictionary(trie: &mut StrTrie<usize>, path: &PathBuf) {
 
 #[allow(clippy::cast_precision_loss)]
 fn score_span(dict: &StrTrie<usize>, rock_you: &StrTrie<usize>, span: &str) -> f64 {
+    println!("scoring span: {span}");
     let num_words = dict.len() as f64;
     let rock_you_count = rock_you.len() as f64;
     let span = demunge(span).to_ascii_lowercase();
     dict.longest_prefix_str(&span).map_or_else(
         || {
-            rock_you.longest_prefix_str(&span).map_or_else(
-                || brute::basic_brute_force_estimate(&span),
-                |found| {
+            rock_you.longest_prefix_entry_str(&span).map_or_else(
+                || {
+                    if span.len() == 1 {
+                        brute::basic_brute_force_estimate(&span)
+                    } else {
+                        let (a, b) = span.split_at(1);
+                        brute_force_only(a) * score_span(dict, rock_you, b)
+                    }
+                },
+                |(str, found)| {
                     if span.len() == *found {
                         rock_you_count
+                    } else if str.len() != *found {
+                        93. * score_span(dict, rock_you, span.split_at(1).1)
                     } else {
                         rock_you_count * score_span(dict, rock_you, span.split_at(*found).1)
                     }
@@ -86,6 +96,7 @@ pub fn estimate_strength(
     if let Some(file) = rockyou_file {
         load_dictionary(&mut rock_you, &file);
     }
+    println!("Finished loading dictionaries");
 
     let scores = password
         .split_whitespace()
