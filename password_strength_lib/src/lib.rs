@@ -25,75 +25,71 @@ fn demunge(password: &str) -> String {
         .replace('?', "y")
 }
 
-fn load_dictionary(trie: &mut StrTrie<usize>, path: PathBuf) -> usize {
+fn load_dictionary(trie: &mut StrTrie<usize>, path: &PathBuf) {
     let Ok(file) = File::open(path) else {
-        return 0;
+        return;
     };
+    println!(
+        "Loading dictionary: {}",
+        path.file_name().unwrap().to_string_lossy()
+    );
     let reader = BufReader::new(file);
 
-    let mut count = 0;
     for line in reader.lines() {
         let Ok(line) = line else {
             continue;
         };
         trie.insert(line.trim().chars(), line.len());
-        count += 1;
     }
-    count
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn score_span(dict: &StrTrie<usize>, rock_you: &StrTrie<usize>, span: &str) -> f64 {
+    let num_words = dict.len() as f64;
+    let rock_you_count = rock_you.len() as f64;
+    let span = demunge(span).to_ascii_lowercase();
+    dict.longest_prefix_str(&span).map_or_else(
+        || {
+            rock_you.longest_prefix_str(&span).map_or_else(
+                || brute::basic_brute_force_estimate(&span),
+                |found| {
+                    if span.len() == *found {
+                        rock_you_count
+                    } else {
+                        rock_you_count * score_span(dict, rock_you, span.split_at(*found).1)
+                    }
+                },
+            )
+        },
+        |found| {
+            if span.len() == *found {
+                num_words
+            } else {
+                num_words * score_span(dict, rock_you, span.split_at(*found).1)
+            }
+        },
+    )
 }
 
 #[must_use]
 pub fn estimate_strength(
     password: &str,
-    plain_dicts: Vec<PathBuf>,
+    plain_dicts: &[PathBuf],
     rockyou_file: Option<PathBuf>,
 ) -> f64 {
     let mut dict = StrTrie::<usize>::new();
-    let mut num_words = 0;
     for file in plain_dicts {
-        num_words += load_dictionary(&mut dict, file);
+        load_dictionary(&mut dict, file);
     }
+
     let mut rock_you = StrTrie::<usize>::new();
-    let mut rock_you_count = 0;
     if let Some(file) = rockyou_file {
-        rock_you_count += load_dictionary(&mut rock_you, file);
+        load_dictionary(&mut rock_you, &file);
     }
-    #[allow(clippy::cast_precision_loss)]
-    let num_words = num_words as f64;
-    #[allow(clippy::cast_precision_loss)]
-    let rock_you_count = rock_you_count as f64;
+
     let scores = password
         .split_whitespace()
-        .map(demunge)
-        .map(|span| {
-            dict.longest_prefix_str(&span.to_ascii_lowercase())
-                .map_or_else(
-                    || {
-                        rock_you
-                            .longest_prefix_str(&span.to_ascii_lowercase())
-                            .map_or_else(
-                                || brute::basic_brute_force_estimate(&span),
-                                |found| {
-                                    if span.len() == *found {
-                                        rock_you_count
-                                    } else {
-                                        rock_you_count
-                                            * brute::basic_brute_force_estimate(
-                                                span.split_at(*found).1,
-                                            )
-                                    }
-                                },
-                            )
-                    },
-                    |found| {
-                        if span.len() == *found {
-                            num_words
-                        } else {
-                            num_words * brute::basic_brute_force_estimate(span.split_at(*found).1)
-                        }
-                    },
-                )
-        })
+        .map(|span| score_span(&dict, &rock_you, span))
         .collect_vec();
     if scores.len() == 1 {
         scores[0]
