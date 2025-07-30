@@ -33,4 +33,5 @@ panic = 'abort'
 strip = "symbols"
 
 [dependencies]
+num-format = "0.4"
 password_strength_lib = { path = "./password_strength_lib" }
