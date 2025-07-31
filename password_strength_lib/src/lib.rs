@@ -44,40 +44,22 @@ fn load_dictionary(trie: &mut StrTrie<usize>, path: &PathBuf) {
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn score_span(dict: &StrTrie<usize>, rock_you: &StrTrie<usize>, span: &str) -> f64 {
-    let num_words = dict.len() as f64;
-    let rock_you_count = rock_you.len() as f64;
+fn score_span(dicts: &[&StrTrie<usize>], span: &str) -> f64 {
+    if span.len() == 1 {
+        return brute_force_only(span);
+    }
     let span = demunge(span).to_ascii_lowercase();
-    dict.longest_prefix_str(&span).map_or_else(
-        || {
-            rock_you.longest_prefix_entry_str(&span).map_or_else(
-                || {
-                    if span.len() == 1 {
-                        brute::basic_brute_force_estimate(&span)
-                    } else {
-                        let (a, b) = span.split_at(1);
-                        brute_force_only(a) * score_span(dict, rock_you, b)
-                    }
-                },
-                |(str, found)| {
-                    if span.len() == *found {
-                        rock_you_count
-                    } else if str.len() != *found {
-                        93. * score_span(dict, rock_you, span.split_at(1).1)
-                    } else {
-                        rock_you_count * score_span(dict, rock_you, span.split_at(*found).1)
-                    }
-                },
-            )
-        },
-        |found| {
-            if span.len() == *found {
-                num_words
-            } else {
-                num_words * score_span(dict, rock_you, span.split_at(*found).1)
+    for dict in dicts {
+        if let Some((found, length)) = dict.longest_prefix_entry_str(&span) {
+            if span.len() == *length {
+                return dict.len() as f64;
+            } else if found.len() != *length {
+                return 93. * score_span(dicts, span.split_at(1).1);
             }
-        },
-    )
+            return dict.len() as f64 * score_span(dicts, span.split_at(*length).1);
+        }
+    }
+    brute_force_only(&span)
 }
 
 #[must_use]
@@ -99,7 +81,7 @@ pub fn estimate_strength(
 
     let scores = password
         .split_whitespace()
-        .map(|span| score_span(&dict, &rock_you, span))
+        .map(|span| score_span(&[&dict, &rock_you], span))
         .collect_vec();
     if scores.len() == 1 {
         scores[0]
