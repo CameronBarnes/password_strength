@@ -18,8 +18,13 @@ fn main() {
     }
     let strength = password_strength_lib::estimate_strength(
         password.trim(),
-        &[PathBuf::from("./words_alpha.txt")],
-        Some(PathBuf::from("./rockyou.txt")),
+        &[
+            PathBuf::from("./words_alpha.txt"),
+            PathBuf::from("./rockyou.txt"),
+            PathBuf::from("./top_family_names_usa.txt"),
+            PathBuf::from("./top_female_names_usa.txt"),
+            PathBuf::from("./top_male_names_usa.txt"),
+        ],
     );
     println!();
     print_speed_for_common_hash("MD5", 98_262_800_000., strength);

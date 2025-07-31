@@ -7,7 +7,8 @@ use rstrie::StrTrie;
 
 mod brute;
 
-fn demunge(password: &str) -> String {
+// I dont currently like how the demunging is behaving
+/*fn demunge(password: &str) -> String {
     password
         .replace(['@', '4'], "a")
         .replace('8', "b")
@@ -23,7 +24,7 @@ fn demunge(password: &str) -> String {
         .replace(['<', '>'], "v")
         .replace('%', "x")
         .replace('?', "y")
-}
+}*/
 
 fn load_dictionary(trie: &mut StrTrie<usize>, path: &PathBuf) {
     let Ok(file) = File::open(path) else {
@@ -39,49 +40,71 @@ fn load_dictionary(trie: &mut StrTrie<usize>, path: &PathBuf) {
         let Ok(line) = line else {
             continue;
         };
-        trie.insert(line.trim().chars(), line.len());
+        let line = line.to_ascii_lowercase();
+        let line = line.trim();
+        trie.insert(line.chars(), line.len());
     }
+}
+
+fn load_dictionaries(dict_paths: &[PathBuf]) -> Vec<StrTrie<usize>> {
+    let mut out = Vec::new();
+    for path in dict_paths {
+        let mut dict = StrTrie::<usize>::new();
+        load_dictionary(&mut dict, path);
+        out.push(dict);
+    }
+    out.push(load_small_num_dict());
+    out.sort_unstable_by_key(rstrie::Trie::len);
+    out
 }
 
 #[allow(clippy::cast_precision_loss)]
-fn score_span(dicts: &[&StrTrie<usize>], span: &str) -> f64 {
+fn score_span(dicts: &[StrTrie<usize>], span: &str) -> f64 {
     if span.len() == 1 {
         return brute_force_only(span);
     }
-    let span = demunge(span).to_ascii_lowercase();
+    // let span = demunge(span).to_ascii_lowercase();
+    let span = span.to_ascii_lowercase();
+    println!("span: {span}");
     for dict in dicts {
-        if let Some((found, length)) = dict.longest_prefix_entry_str(&span) {
-            if span.len() == *length {
+        if let Some((found, _length)) = dict.longest_prefix_entry_str(&span) {
+            if span.eq_ignore_ascii_case(&found) {
+                // println!("found: {found}");
                 return dict.len() as f64;
-            } else if found.len() != *length {
-                return 93. * score_span(dicts, span.split_at(1).1);
+            } else if let Some((_before, after)) = span.split_once(&found) {
+                // println!("good prefix found: {found}");
+                return dict.len() as f64 * score_span(dicts, after);
             }
-            return dict.len() as f64 * score_span(dicts, span.split_at(*length).1);
         }
     }
+    // println!("None found, brute forcing span: {span}");
     brute_force_only(&span)
 }
 
-#[must_use]
-pub fn estimate_strength(
-    password: &str,
-    plain_dicts: &[PathBuf],
-    rockyou_file: Option<PathBuf>,
-) -> f64 {
-    let mut dict = StrTrie::<usize>::new();
-    for file in plain_dicts {
-        load_dictionary(&mut dict, file);
+fn load_small_num_dict() -> StrTrie<usize> {
+    println!("Loading dictionary: small numbers");
+    let mut small_num_dict = StrTrie::<usize>::new();
+    for i in 100..=2100 {
+        let str = i.to_string();
+        let str = str.trim();
+        small_num_dict.insert(str.chars(), str.len());
     }
+    for i in 2..=9 {
+        let str = (1111 * i).to_string();
+        let str = str.trim();
+        small_num_dict.insert(str.chars(), str.len());
+    }
+    small_num_dict
+}
 
-    let mut rock_you = StrTrie::<usize>::new();
-    if let Some(file) = rockyou_file {
-        load_dictionary(&mut rock_you, &file);
-    }
+#[must_use]
+pub fn estimate_strength(password: &str, dict_files: &[PathBuf]) -> f64 {
+    let dicts = load_dictionaries(dict_files);
     println!("Finished loading dictionaries");
 
     let scores = password
         .split_whitespace()
-        .map(|span| score_span(&[&dict, &rock_you], span))
+        .map(|span| score_span(&dicts, span))
         .collect_vec();
     if scores.len() == 1 {
         scores[0]
